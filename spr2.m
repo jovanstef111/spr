@@ -1,8 +1,9 @@
-% new method
+% new method applied to Example 1 in Stefanovski (2024)
 clear
-clear
+
 n=10;
-m=2;
+m=2; % number of inputs/outputs
+
 A=-[2 -3 -2 1 -1 0 1 2 -1 3 ; 
    0 0 -2 1 -1 -2 3 1 1 0  ;
    -2 1 3 2 -3 0 -1 1 3 3  ;
@@ -12,7 +13,7 @@ A=-[2 -3 -2 1 -1 0 1 2 -1 3 ;
     2 -1 -3 -2 -3 1 0 -1 3 -3  ;
     3 -1 0 -2 0 1 -1 2 3 1  ; 
     2 0 1 3 -1 3 -1 1 0 -1 ;
-    1 0 -1 0 1 -3 1 -1 0 1 ];
+    -1 0 1 0 -1 3 -1 1 0 -1 ] ;
 B=-[ -2 -1 ; 1 3 ; -1 0 ; -2 3 ; 2 0 ; 
     -1 2 ; -2 -3 ; 0 1 ; -1 0 ; -1 3 ];
     
@@ -22,17 +23,17 @@ D=[0 -1 ; 0 1];
 
 G=ss(A,B,C,D);
 
-% Argument transformation of G
-bet=-0.05;
+% Argument transformation of the plant, defined with bet
+bet=-0.03;
 B0=B;
 A0=(A-bet*eye(n))*(eye(n)-bet*A)^(-1);
 C0=(1-bet^2)*C*(eye(n)-bet*A)^(-2);
 D0=D+bet*C*(eye(n)-bet*A)^(-1)*B;
 
-% Transformed plant transfer matrix
-G0=ss(A0,B0,C0,D0);
+G0=ss(A0,B0,C0,D0); % Transformed ppant
 
  [X,L,F] = care(A0,B0,1*eye(n),1*eye(m)); % needed for coprime fact. of G0
+ 
  % Checking
  eig(A0-B0*F) % stable
  % %%%%%%%%%%%%%%%%%%%
@@ -42,49 +43,44 @@ G0=ss(A0,B0,C0,D0);
  bP=ss(A0-B0*F,B0,C0-D0*F,D0);
  
  s=tzero(bP)
- % interpol. points.
+ % interpolation points
  s1=s(1);
- s2=s(10);
- s3=s(5);
- s4=s(6);
- s5=s(7);
- s6=s(8);
+ s2=s(6);
+ s3=s(9);
+ s4=s(7);
+ s5=s(8);
  
- ell=6; % number of interpol. points
+ ell=5; % number of interpol. cond.
  
- % interpol. vectors
+ % interpolation conditions
  [AM,BM,CM,DM]=ssdata(bP);
  x1=null1(DM+CM*(s1*eye(n)-AM)^(-1)*BM);
  x2=null1(DM+CM*(s2*eye(n)-AM)^(-1)*BM);
  x3=null1(DM+CM*(s3*eye(n)-AM)^(-1)*BM);
  x4=null1(DM+CM*(s4*eye(n)-AM)^(-1)*BM);
- x5=null1(DM+CM*(s5*eye(n)-AM)^(-1)*BM);
- x6=null1(DM+CM*(s6*eye(n)-AM)^(-1)*BM);
+ x5=conj(x4);
 
  [AY,BY,CY,DY]=ssdata(bQ);
  y1=(DY+CY*(s1*eye(n)-AY)^(-1)*BY)*x1;
  y2=(DY+CY*(s2*eye(n)-AY)^(-1)*BY)*x2;
  y3=(DY+CY*(s3*eye(n)-AY)^(-1)*BY)*x3;
  y4=(DY+CY*(s4*eye(n)-AY)^(-1)*BY)*x4; 
- y5=(DY+CY*(s5*eye(n)-AY)^(-1)*BY)*x5; 
- y6=(DY+CY*(s6*eye(n)-AY)^(-1)*BY)*x6; 
+ y5=conj(y4); 
  
-Api=diag([s1,s2,s3,s4,s5,s6]);
-Cmin=[x1,x2,x3,x4,x5,x6];
-Cpl=[y1,y2,y3,y4,y5,y6];
-
-% transformation of complex to real interpolat. data
+Api=diag([s1,s2,s3,s4,s5]);
+Cmin=[x1,x2,x3,x4,x5];
+Cpl=[y1,y2,y3,y4,y5];
 T0=[1 -complex(0,1); 1 complex(0,1)]/sqrt(2);
-T=[eye(2) zeros(2,4); 
-    zeros(2,2) T0 zeros(2,2); zeros(2,4) T0];
+T=[eye(3) zeros(3,2); 
+    zeros(2,3) T0];
 hApi=real(T'*Api*T);
 hCmin=real(Cmin*T);
 hCpl=real(Cpl*T);
 
-% finding the auxiliary Qaux
+% finding auxiliary matrix Qaux
 [Qaux]=nult(hApi,hCmin);
 
-% Iterations to find matrices Q_i
+% Iterations for finding matrices Q_i
 Q(:,:,1)=hCpl;
 for i=1:15
     i
@@ -94,7 +90,8 @@ for i=1:15
     end
 end
 
-% Iterations to find the SPR factors Hm
+
+% Iterations for finding the interpolant H, as a product of SPR RMs
 H=1;
 for ii=1:i+1
     Cplii=Q(:,:,ii);
@@ -107,14 +104,14 @@ for ii=1:i+1
 
 XX=lyap(hApi',-(Cminii'*Cplii+Cplii'*Cminii)); % Pick matrix
 
-% checking
-%e=eig(XX)
+% checking its eig.
+e=eig(XX)
 % %%%%%%%%
 
 % SPR interpolant
 Hm=dss(XX*hApi-(Cminii+Cplii)'*Cminii,(Cminii+Cplii)' , Cplii-Cminii, eye(m), XX);
 
-% checking Hm
+% checking the Hm
 [AH,BH,CH,DH]=ssdata(Hm);
 [eH,eH1]=size(AH);
 pole(Hm)
@@ -130,9 +127,9 @@ pom2=Cminii*T';
 % checking the SPR property of Hm
 PP=ispr(AH,BH,CH,DH);
 ePP=eig(PP)
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%
 
-H=H*Hm; % The final interpolant H is product of i+1 RMs Hm
+H=H*Hm; % H is product of i+1 RMs Hm
 end
 
 % checking H
@@ -148,13 +145,13 @@ tzero(H)
 (DH+CH*(s5*EH-AH)^(-1)*BH)*Cmin(:,5)-Cpl(:,5)
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Cons=(bQ-H)*bP^(-1); % controller (transformed)
-Contr=balreal(minreal(minreal(Cons))); % canceling its unstable modes (interp.points)
+Cons=(bQ-H)*bP^(-1);
+Contr=balreal(minreal(minreal(Cons)));
 %Contr=balreal(minreal(minreal(stabsep(Cons)))); %same result with minreal
 
 [AA, BB, CC, DD, EE]=dssdata(Contr);
 
-pp=pole(Contr)  %  Contr. is stable
+pp=pole(Contr)  %  kontr. is stable
 zz=tzero([ eye(m) G0; Contr eye(m)]) % and CLS is stable
 
 % checking
@@ -165,7 +162,7 @@ pom(iii)=(zz(iii)+bet)/(1+bet*zz(iii));
 end
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% inverse argument transformation of the transformed contr.
+% inverse argument transformation of the contr.
 [AC,BC,CC,DC]=ssdata(Contr);
 [nC,nC1]=size(AC);
 betm=-bet;
@@ -181,8 +178,8 @@ Con=ss(A00,B00,C00,D00);
 pp1=pole(Con)
 zz1=tzero([ eye(m) G; Con eye(m)])
 
-% reductiom of controller
-Conr=reduce(Con,22);
+% reduction of controller
+Conr=reduce(Con,12);
 
 % checking the stab. of contr. and of CLS with Conr
 ppr=pole(Conr)  %  kontr. e stabilen
@@ -231,7 +228,6 @@ elseif isinf(TH) || isnan(TH)
 else
     ind=1; % disp('Feasible solution found.');
     Qopt=dec2mat(LMIs,xfeas,Y);
-    Qopt=Qopt/norm(Qopt);
     return
 end
 
@@ -265,9 +261,7 @@ end
 
 options=[0,0,0,0,0];
 output1 = evalc('[TH,xfeas] = mincx(LMIs,c,options);');
-Xopt=dec2mat(LMIs,xfeas,X);
-
-Qopt=dec2mat(LMIs,xfeas,Y);
+Qopt=dec2mat(LMIs,xfeas,Q);
 
 end
 
@@ -314,6 +308,7 @@ Qaux=dec2mat(LMIs,xfeas,Y);
 %eXX=eig(XX)
 
 end
+
 
 function Popt=ispr(A,B,C,D)
 
